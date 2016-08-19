@@ -18,7 +18,7 @@ typedef signed long    s32;
 #define MCUSLEEP asm("halt");//sleep
 
 //include file
-#include "iostm8s103f3.h"
+#include "iostm8s005k6.h"
 
 #endif
 

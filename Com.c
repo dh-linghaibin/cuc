@@ -32,12 +32,12 @@ void ComInit(void) {
     PD_CR1 |= BIT(5); 
     PD_CR2 |= BIT(5);
 
-    UART1_CR1=0x00;
-    UART1_CR2=0x00;
-    UART1_CR3=0x00; 
-    UART1_BRR2=0x02;//02 0a
-    UART1_BRR1=0x68;//68 08
-    UART1_CR2=0x2c;//允许接收，发送，开接收中断
+    UART2_CR1=0x00;
+    UART2_CR2=0x00;
+    UART2_CR3=0x00; 
+    UART2_BRR2=0x02;//02 0a
+    UART2_BRR1=0x68;//68 08
+    UART2_CR2=0x2c;//允许接收，发送，开接收中断
 }
 /**********************************************函数定义***************************************************** 
 * 函数名称: void ComSend(u8 cmd, u8 dat1,u8 dat2,u8 dat3) 
@@ -66,8 +66,8 @@ void ComSend(u8 cmd, u8 dat1,u8 dat2,u8 dat3) {
     data[6] = (u8)(cheek>>8);
     DelayMs(10);
     for(i = 0;i < 8;i++) {
-        while((UART1_SR & 0x80) == 0x00);
-        UART1_DR = data[i];
+        while((UART2_SR & 0x80) == 0x00);
+        UART2_DR = data[i];
     }
 }
 /**********************************************函数定义***************************************************** 
@@ -133,9 +133,9 @@ u8 ComCheck(void) {
 __interrupt void UART1_RX_IRQHandler(void)
 {
     u8 data;
-    data = UART1_DR;
+    data = UART2_DR;
     /*等待数据接受完成*/
-    while((UART1_SR & 0x80) == 0x00);
+    while((UART2_SR & 0x80) == 0x00);
     /*防止数据与头帧冲突*/
     if(com_data_one.rs_flag == 0x00) {
         if(data == com_head_frame) {

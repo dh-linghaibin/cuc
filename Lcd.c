@@ -19,12 +19,12 @@
 #include "Delay.h"
 #include "Materal.h"
 
-#define CS_H    PA_ODR_ODR3 = 1     //PH4 E
-#define CS_L    PA_ODR_ODR3 = 0
-#define SID_H   PA_ODR_ODR2 = 1     //PH5 SID
-#define SID_L   PA_ODR_ODR2 = 0
-#define SCLK_H  PA_ODR_ODR1 = 1     //PH6 SCLK
-#define SCLK_L  PA_ODR_ODR1 = 0
+#define CS_H    PB_ODR_ODR0 = 1     //PH4 E
+#define CS_L    PB_ODR_ODR0 = 0
+#define SID_H   PB_ODR_ODR1 = 1     //PH5 SID
+#define SID_L   PB_ODR_ODR1 = 0
+#define SCLK_H  PB_ODR_ODR2 = 1     //PH6 SCLK
+#define SCLK_L  PB_ODR_ODR2 = 0
 
 /*
 *send 8 bit data to lcd
@@ -75,17 +75,17 @@ static void WriteData(u8 Dispdata)
 }
 
 void LcdInit(void) {   
-    PA_DDR_DDR1 = 1;
-    PA_CR1_C11 = 1;
-    PA_CR2_C21 = 0;
+    PB_DDR_DDR0 = 1;
+    PB_CR1_C10 = 1;
+    PB_CR2_C20 = 0;
     
-    PA_DDR_DDR2 = 1;
-    PA_CR1_C12 = 1;
-    PA_CR2_C22 = 0;
+    PB_DDR_DDR1 = 1;
+    PB_CR1_C11 = 1;
+    PB_CR2_C21 = 0;
     
-    PA_DDR_DDR3 = 1;
-    PA_CR1_C13 = 1;
-    PA_CR2_C23 = 0;
+    PB_DDR_DDR2 = 1;
+    PB_CR1_C12 = 1;
+    PB_CR2_C22 = 0;
     
     DelayMs(250);
     WriteCom(0x30);  //30-- basic command operation
@@ -104,7 +104,7 @@ Function name: Display LCD Pos
 Returns: None
 Function: Set the display position
 *********************************************************/
-static void LCDPos(u8 x,u8 y) 
+void LCDPos(u8 x,u8 y) 
 {
 	u8 pos;
 	switch(x)
@@ -137,7 +137,9 @@ void LCDNum(u8 num)
 {
     WriteData(0x30+num);
 }
-
+void LcdFolt(u8 num) {
+    WriteData(0x20+num);
+};
 /**********************************************函数定义***************************************************** 
 * 函数名称: void LcdDrawClear(void) 
 * 输入参数: void 
@@ -174,7 +176,42 @@ void LcdDrawClear(void) {
     }  
     WriteCom(0x30);        //回到基本指令集
 }
-
+/**********************************************函数定义***************************************************** 
+* 函数名称: void LcdDraw16Clear(u8 line, u8 row) 
+* 输入参数: u8 line, u8 row 
+* 返回参数: void  
+* 功    能:   
+* 作    者: by lhb_steven
+* 日    期: 2016/7/15
+************************************************************************************************************/ 
+void LcdDraw16Clear(u8 line, u8 row) { 
+    u8 i,j,k;
+    u16 line_bit = 0;
+    
+    WriteCom(0x34);        //打开扩展指令集
+    WriteCom(0x36);        //打开绘图显示
+    
+    if(line < 32) {
+        line_bit = 0x80;
+        i = 0x80+line;   
+    } else {
+        line_bit = 0x88;
+        i = 0x80+line-32;   
+    }
+    
+    
+    line_bit += row;
+    for(j = 0;j < 16;j++)//32
+    {
+        WriteCom(i++);
+        WriteCom(line_bit);
+        for(k = 0;k < 2;k++)//16
+        {
+            WriteData(0x00);
+        }
+    }
+    WriteCom(0x30);        //回到基本指令集
+}
 /**********************************************函数定义***************************************************** 
 * 函数名称: void LcdDraw16(u8 line,u8 row) 
 * 输入参数: u8 line,u8 row 
