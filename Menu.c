@@ -45,8 +45,8 @@
 推书键：按下复位键马上释放后程序自动推纸，如果按下时间超过2秒钟，程序则进行推纸器复位
 */
 typedef enum {
-    best_arrive = 3000,//最大位置
-    best_sep_aaive = 47700,
+    best_arrive = 4900,//最大位置
+    best_sep_aaive = 47000,
 }menudata;
 
 typedef struct DataNode
@@ -65,7 +65,7 @@ typedef struct DataNode
     u16 aut_e[8];//保存自动模式下第一组数据                 (16,17) (18,19) (20,21) (22,23) (24,25) (26,27) (28,29) (30,31)
     u16 aut_group;//对第几组数据操作
     u8 aut_m_num;//对第几位进行更改
-    u16 siuare_data[2];//等分模式 数据                     (35,36) (37,38)
+    u16 siuare_data[3];//等分模式 数据                     (35,36) (37,38)
     
     u8 program;//编程位                                    
     u8 moto_vigor;//电机力度 0-10                          39 
@@ -578,7 +578,8 @@ void MenuSetAutData(u8 num) {
                 menu.aut_m_num = 0;
                 menu.aut_m = 8;
                 MenuSaveData();//保存数据
-                ComSend(0xb0,(u8)(menu.siuare_data[0]/menu.siuare_data[1]),(u8)(menu.siuare_data[1]),(u8)(menu.siuare_data[1] >> 8));
+                menu.siuare_data[2] = (u16)(menu.siuare_data[1]* (best_sep_aaive/best_arrive));
+                ComSend(0xb0,(u8)(menu.siuare_data[0]/menu.siuare_data[1]),(u8)(menu.siuare_data[2]),(u8)(menu.siuare_data[2] >> 8));
             }
             menu.siuare_data[menu.aut_group] = aut_h0*1000;
             menu.siuare_data[menu.aut_group] += aut_h1*100;
@@ -627,6 +628,7 @@ void MenuModeSet(u8 cmd) {
                 MenuShowPushFlag(menu.push_book);//显示是否需要推纸
                 ComSend(0xa1,0x00,0x00,0x00);//退出老化模式
             }
+            DelayMs(30);
             if(menu.mode < 2) {
                 menu.mode++;
             } else {
@@ -637,14 +639,17 @@ void MenuModeSet(u8 cmd) {
             MenuShowMode(menu.mode);//显示当前模式
             MenuShowData(menu.mode);//显示数据
             menu.knife_rear_size_setp = (u16)(( (best_arrive-menu.knife_rear_size) * (best_sep_aaive/best_arrive)));
+            //menu.knife_rear_size_setp = best_sep_aaive - menu.knife_rear_size_setp;
             if(menu.push_book == 0) {
                 ComSend(0x04,menu.mode,(u8)(menu.knife_rear_size_setp),(u8)(menu.knife_rear_size_setp >> 8));
             } else {
                 ComSend(0x05,menu.mode,(u8)(menu.knife_rear_size_setp),(u8)(menu.knife_rear_size_setp >> 8));
             }
+            DelayMs(30);
             if(menu.mode == 2) {//等分模式
                 DelayMs(20);
-                ComSend(0xb0,(u8)(menu.siuare_data[0]/menu.siuare_data[1]),(u8)(menu.siuare_data[1]),(u8)(menu.siuare_data[1] >> 8));
+                menu.siuare_data[2] = (u16)(menu.siuare_data[1]* (best_sep_aaive/best_arrive));
+                ComSend(0xb0,(u8)(menu.siuare_data[0]/menu.siuare_data[1]),(u8)(menu.siuare_data[2]),(u8)(menu.siuare_data[2] >> 8));
             }
             MenuSaveData();
         break;
@@ -659,6 +664,7 @@ void MenuModeSet(u8 cmd) {
                 LCDNum(menu.knife_rear_size%10);  
                 
                 menu.knife_rear_size_setp = (u16)(( (best_arrive-menu.knife_rear_size) * (15.9)));
+                //menu.knife_rear_size_setp = best_sep_aaive - menu.knife_rear_size_setp;
                 if(menu.push_book == 0) {
                     ComSend(0x04,menu.mode,(u8)(menu.knife_rear_size_setp),(u8)(menu.knife_rear_size_setp >> 8));
                 } else {
@@ -878,8 +884,15 @@ void MenuModeSet(u8 cmd) {
         case 21://推书键短按
             if(menu.push_book == 0) {
                 menu.push_book = 1;
+                //ComSend(0x05,menu.mode,0x00,0x00);//复位
             } else {
                 menu.push_book = 0;
+                //ComSend(0x04,menu.mode,0x00,0x00);//复位
+            }
+            if(menu.push_book == 0) {
+                ComSend(0x04,menu.mode,(u8)(menu.knife_rear_size_setp),(u8)(menu.knife_rear_size_setp >> 8));
+            } else {
+                ComSend(0x05,menu.mode,(u8)(menu.knife_rear_size_setp),(u8)(menu.knife_rear_size_setp >> 8));
             }
             MenuShowPushFlag(menu.push_book);
         break;

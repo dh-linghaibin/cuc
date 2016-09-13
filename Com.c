@@ -129,8 +129,8 @@ u8 ComCheck(void) {
 }
 
 
-#pragma vector=0x14
-__interrupt void UART1_RX_IRQHandler(void)
+#pragma vector=0x17
+__interrupt void UART2_RX_IRQHandler(void)
 {
     u8 data;
     data = UART2_DR;

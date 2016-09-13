@@ -1,3 +1,5 @@
+[DebugChecksum]
+Checksum=1863660910
 [Stack]
 FillEnabled=0
 OverflowWarningsEnabled=1
@@ -8,14 +10,10 @@ UseTrigger=1
 TriggerName=main
 LimitSize=0
 ByteLimit=50
-[DebugChecksum]
-Checksum=-207633149
 [CallStack]
 ShowArgs=0
 [Disassembly]
 MixedMode=1
-[watch_formats]
-Fmt0={W}42:menu.program	3	0
 [DataSample]
 LogEnabled=0
 GraphEnabled=0
