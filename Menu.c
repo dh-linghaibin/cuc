@@ -46,7 +46,13 @@
 */
 typedef enum {
     best_arrive = 4900,//最大位置
-    best_sep_aaive = 47000,
+    COM_SETP = 0x01,
+    COM_MODE = 0X02,//发送当前模式
+    COM_PUSH_BOOK = 0x03,//是否推书
+    COM_STP_RST = 0X04,//推纸电机复位
+    COM_SIU_DATA = 0x05,//等分数据
+    COM_OLD = 0X07,//老化模式
+    COM_STRENGTH = 0x08,//设置电机力度
 }menudata;
 
 typedef struct DataNode
@@ -58,15 +64,14 @@ typedef struct DataNode
     u16 ttl;//裁切总刀数                                       8 9
     u8 push_book;//是否需要推书                               11   
     u16 knife_front_size;//刀前尺寸                           12 13
-    u16 knife_rear_size;//刀后尺寸                            14 15
-    u16 knife_rear_size_setp;//步进尺寸                           
+    u16 knife_rear_size;//刀后尺寸                            14 15                        
     u16 group_no;//保存数据组号     
     u8 aut_m;//保存是否可以设置数据
     u16 aut_e[8];//保存自动模式下第一组数据                 (16,17) (18,19) (20,21) (22,23) (24,25) (26,27) (28,29) (30,31)
     u16 aut_group;//对第几组数据操作
     u8 aut_m_num;//对第几位进行更改
-    u16 siuare_data[3];//等分模式 数据                     (35,36) (37,38)
-    
+    u16 siuare_data[4];//等分模式 数据                     (35,36) (37,38)   52
+    u16 manual_m;//手动模式需要走到的位置                  50 51
     u8 program;//编程位                                    
     u8 moto_vigor;//电机力度 0-10                          39 
     u8 mtot_cut_place;//电机位置 0-20                      40
@@ -106,12 +111,17 @@ void MenuInit(void) {
     menu.mtot_cut_place = EepromRead(40);//电机刀位置微调
     menu.size_sys = EepromRead(41);//尺寸
     
+    
+    menu.manual_m = EepromRead(50);//手动尺寸
+    menu.manual_m |= (u16)(EepromRead(51) << 8);
+    
     for(int save_i = 0; save_i < 2; save_i++) {
         u8 save_adr = 0;
         save_adr = 35+save_i*2;
         menu.siuare_data[save_i] = EepromRead(save_adr);
         menu.siuare_data[save_i] |= (u16)(EepromRead(save_adr+1) << 8);
     }
+    menu.siuare_data[2] = EepromRead(52);
     
     for(int save_i = 0; save_i < 8; save_i++) {
         u8 save_adr = 0;
@@ -167,6 +177,10 @@ void MenuSaveData(void) {
         EepromWrite(save_adr,(u8)menu.siuare_data[save_i]);
         EepromWrite(save_adr+1,(u8)(menu.siuare_data[save_i] >> 8));
     }
+    EepromWrite(52,(u8)menu.siuare_data[2]);
+    
+    EepromWrite(50,(u8)menu.manual_m);
+    EepromWrite(51,(u8)(menu.manual_m >> 8));
 }
 /**********************************************函数定义***************************************************** 
 * 函数名称: void MenuShowMode(u8 md) 
@@ -301,7 +315,7 @@ void MenuShowData(u8 md) {
             }
             break;
         case 1://手动模式
-            LCDString(0,4," ",1);
+            LCDString(0,4,"         ",1);
             LcdDraw16Clear(32,4);
             LcdDraw16Clear(48,4);
             LcdDraw16Clear(32,5);
@@ -322,51 +336,107 @@ void MenuShowData(u8 md) {
             LcdDrawNum8(24,5,0,menu.ttl/10000);
             LcdDrawNum8(24,6,menu.ttl/1000%10,menu.ttl/100%10);
             LcdDrawNum8(24,7,menu.ttl%100/10,menu.ttl%100%10);  
+            
+            if(menu.aut_m == 0) {//修改模式
+                if(menu.aut_m_num == 0) {
+                    LcdDrawNum8(3,5,11,menu.manual_m/100%10);
+                    LcdDrawNum8(3,6,menu.manual_m%100/10,10);
+                    LcdDrawNum8(3,7,menu.manual_m%10,12);
+                } else if(menu.aut_m_num == 1) {
+                   LcdDrawNum8(3,5,menu.manual_m/1000,11);
+                    LcdDrawNum8(3,6,menu.manual_m%100/10,10);
+                    LcdDrawNum8(3,7,menu.manual_m%10,12);
+                } else if(menu.aut_m_num == 2) {
+                    LcdDrawNum8(3,5,menu.manual_m/1000,menu.manual_m/100%10);
+                    LcdDrawNum8(3,6,11,10);
+                    LcdDrawNum8(3,7,menu.manual_m%10,12);
+                } else if(menu.aut_m_num == 3) {
+                    LcdDrawNum8(3,5,menu.manual_m/1000,menu.manual_m/100%10);
+                    LcdDrawNum8(3,6,menu.manual_m%100/10,10);
+                    LcdDrawNum8(3,7,11,12);
+                } 
+            } else {
+                LcdDrawNum8(3,5,menu.manual_m/1000,menu.manual_m/100%10);
+                LcdDrawNum8(3,6,menu.manual_m%100/10,10);
+                LcdDrawNum8(3,7,menu.manual_m%10,13);
+            }
+            
             break;
         case 2://等分模式
             LcdDraw16Clear(0,4);
+            
+            LcdDrawNum8(3,5,13,13);
+            LcdDrawNum8(3,6,13,13);
+            LcdDrawNum8(3,7,13,13);
+            
             LCDString(0,4,"S 23",1);
             LcdDraeBq8x16(16,4,0+8);//e
             LcdDraeBq8x16(24,4,1+8);
+            LcdDraeBq8x16(32,4,2+8);
             
-//            LcdDrawNum8(16,5,3,0);
-//            LcdDrawNum8(16,6,0,10);
-//            LcdDrawNum8(16,7,0,12);
-//
-//            LcdDrawNum8(24,5,11,11);
-//            LcdDrawNum8(24,6,11,11);
-//            LcdDrawNum8(24,7,11,11);
-            for(int show_i = 0; show_i < 2; show_i++) {
+            for(int show_i = 0; show_i < 3; show_i++) {
                 u8 show_x = 0;
                 show_x = 16+show_i*8;
                 if(menu.aut_group == show_i) {//第一组
                     if(menu.aut_m == 0) {//修改模式
-                        if(menu.aut_m_num == 0) {
-                            LcdDrawNum8(show_x,5,11,menu.siuare_data[menu.aut_group]/100%10);
-                            LcdDrawNum8(show_x,6,menu.siuare_data[menu.aut_group]%100/10,10);
-                            LcdDrawNum8(show_x,7,menu.siuare_data[menu.aut_group]%10,12);
-                        } else if(menu.aut_m_num == 1) {
-                           LcdDrawNum8(show_x,5,menu.siuare_data[menu.aut_group]/1000,11);
-                            LcdDrawNum8(show_x,6,menu.siuare_data[menu.aut_group]%100/10,10);
-                            LcdDrawNum8(show_x,7,menu.siuare_data[menu.aut_group]%10,12);
-                        } else if(menu.aut_m_num == 2) {
-                            LcdDrawNum8(show_x,5,menu.siuare_data[menu.aut_group]/1000,menu.siuare_data[menu.aut_group]/100%10);
-                            LcdDrawNum8(show_x,6,11,10);
-                            LcdDrawNum8(show_x,7,menu.siuare_data[menu.aut_group]%10,12);
-                        } else if(menu.aut_m_num == 3) {
-                            LcdDrawNum8(show_x,5,menu.siuare_data[menu.aut_group]/1000,menu.siuare_data[menu.aut_group]/100%10);
-                            LcdDrawNum8(show_x,6,menu.siuare_data[menu.aut_group]%100/10,10);
-                            LcdDrawNum8(show_x,7,11,12);
-                        } 
+                        if(show_i == 2) {//显示需要切几道
+                            if(menu.aut_m_num == 0) {
+                                LcdDrawNum8(show_x,5,0,11);
+                                LcdDrawNum8(show_x,6,menu.siuare_data[show_i]/100%10,menu.siuare_data[show_i]%100/10);
+                                LcdDrawNum8(show_x,7,menu.siuare_data[show_i]%10,12);
+                            } else if(menu.aut_m_num == 1) {
+                                LcdDrawNum8(show_x,5,0,menu.siuare_data[show_i]/1000);
+                                LcdDrawNum8(show_x,6,11,menu.siuare_data[show_i]%100/10);
+                                LcdDrawNum8(show_x,7,menu.siuare_data[show_i]%10,12);
+                            } else if(menu.aut_m_num == 2) {
+                                LcdDrawNum8(show_x,5,0,menu.siuare_data[show_i]/1000);
+                                LcdDrawNum8(show_x,6,menu.siuare_data[show_i]/100%10,11);
+                                LcdDrawNum8(show_x,7,menu.siuare_data[show_i]%10,12);
+                            } else if(menu.aut_m_num == 3) {
+                                LcdDrawNum8(show_x,5,0,menu.siuare_data[show_i]/1000);
+                                LcdDrawNum8(show_x,6,menu.siuare_data[show_i]/100%10,menu.siuare_data[show_i]%100/10);
+                                LcdDrawNum8(show_x,7,11,12);
+                            } 
+                        } else {
+                            if(menu.aut_m_num == 0) {
+                                LcdDrawNum8(show_x,5,11,menu.siuare_data[menu.aut_group]/100%10);
+                                LcdDrawNum8(show_x,6,menu.siuare_data[menu.aut_group]%100/10,10);
+                                LcdDrawNum8(show_x,7,menu.siuare_data[menu.aut_group]%10,12);
+                            } else if(menu.aut_m_num == 1) {
+                               LcdDrawNum8(show_x,5,menu.siuare_data[menu.aut_group]/1000,11);
+                                LcdDrawNum8(show_x,6,menu.siuare_data[menu.aut_group]%100/10,10);
+                                LcdDrawNum8(show_x,7,menu.siuare_data[menu.aut_group]%10,12);
+                            } else if(menu.aut_m_num == 2) {
+                                LcdDrawNum8(show_x,5,menu.siuare_data[menu.aut_group]/1000,menu.siuare_data[menu.aut_group]/100%10);
+                                LcdDrawNum8(show_x,6,11,10);
+                                LcdDrawNum8(show_x,7,menu.siuare_data[menu.aut_group]%10,12);
+                            } else if(menu.aut_m_num == 3) {
+                                LcdDrawNum8(show_x,5,menu.siuare_data[menu.aut_group]/1000,menu.siuare_data[menu.aut_group]/100%10);
+                                LcdDrawNum8(show_x,6,menu.siuare_data[menu.aut_group]%100/10,10);
+                                LcdDrawNum8(show_x,7,11,12);
+                            } 
+                        }
                     } else {
-                        LcdDrawNum8(show_x,5,menu.siuare_data[menu.aut_group]/1000,menu.siuare_data[menu.aut_group]/100%10);
-                        LcdDrawNum8(show_x,6,menu.siuare_data[menu.aut_group]%100/10,10);
-                        LcdDrawNum8(show_x,7,menu.siuare_data[menu.aut_group]%10,12);
+                        if(show_i == 2) {//显示需要切几道
+                            LcdDrawNum8(show_x,5,0,menu.siuare_data[show_i]/1000);
+                            LcdDrawNum8(show_x,6,menu.siuare_data[show_i]/100%10,menu.siuare_data[show_i]%100/10);
+                            LcdDrawNum8(show_x,7,menu.siuare_data[show_i]%10,12);
+                        } else {
+                            LcdDrawNum8(show_x,5,menu.siuare_data[menu.aut_group]/1000,menu.siuare_data[menu.aut_group]/100%10);
+                            LcdDrawNum8(show_x,6,menu.siuare_data[menu.aut_group]%100/10,10);
+                            LcdDrawNum8(show_x,7,menu.siuare_data[menu.aut_group]%10,12);
+                        }
                     }
                 } else {
-                    LcdDrawNum8(show_x,5,menu.siuare_data[show_i]/1000,menu.siuare_data[show_i]/100%10);
-                    LcdDrawNum8(show_x,6,menu.siuare_data[show_i]%100/10,10);
-                    LcdDrawNum8(show_x,7,menu.siuare_data[show_i]%10,13);
+                    if(show_i == 2) {//显示需要切几道
+                        LcdDrawNum8(show_x,5,0,menu.siuare_data[show_i]/1000);
+                        LcdDrawNum8(show_x,6,menu.siuare_data[show_i]/100%10,menu.siuare_data[show_i]%100/10);
+                        LcdDrawNum8(show_x,7,menu.siuare_data[show_i]%10,13);
+                    } else {
+                        LcdDrawNum8(show_x,5,menu.siuare_data[show_i]/1000,menu.siuare_data[show_i]/100%10);
+                        LcdDrawNum8(show_x,6,menu.siuare_data[show_i]%100/10,10);
+                        LcdDrawNum8(show_x,7,menu.siuare_data[show_i]%10,13);
+                    }
                 }
             }
             break;
@@ -492,7 +562,20 @@ void MenuShowData(u8 md) {
             if(menu.language == 0) {
                 LCDString(1,0,"    AGING MODE",1);
             } else {
-                LCDString(1,0,"    老化模式",1);
+                LCDString(1,0,"  老化模式:",1);
+            }
+            switch(menu.set_pag1) {
+                case 0:
+                    LCDString(1,6,"1",1);
+                    break;
+                case 1:
+                    LCDString(1,6,"2",1);
+                    break;
+                case 2:
+                    LCDString(1,6,"3",1);
+                    break;
+                default:
+                    break;
             }
             break;
         default:
@@ -553,7 +636,37 @@ void MenuSetAutData(u8 num) {
             }
         }
     } else if(menu.mode == 1) {//手动
-    
+        if(menu.aut_m == 0) {
+            u8 aut_h0 = 0;
+            u8 aut_h1 = 0;
+            u8 aut_h2 = 0;
+            u8 aut_h3 = 0;
+            aut_h0 = menu.manual_m/1000;
+            aut_h1 = menu.manual_m/100%10;
+            aut_h2 = menu.manual_m%100/10;
+            aut_h3 = menu.manual_m%10;
+            if(menu.aut_m_num == 0) {
+                aut_h0 = num;
+                menu.aut_m_num = 1;
+            } else if(menu.aut_m_num == 1) {
+                aut_h1 = num;
+                menu.aut_m_num = 2;
+            } else if(menu.aut_m_num == 2) {
+                aut_h2 = num;
+                menu.aut_m_num = 3;
+            } else if(menu.aut_m_num == 3) {
+                aut_h3 = num;
+                menu.aut_m_num = 0;
+                menu.aut_m = 8;
+            }
+            menu.manual_m = aut_h0*1000;
+            menu.manual_m += aut_h1*100;
+            menu.manual_m += aut_h2*10;
+            menu.manual_m += aut_h3;
+            if(menu.manual_m > best_arrive) {
+                menu.manual_m = best_arrive;
+            }
+        }
     } else if(menu.mode == 2) {//等分
         if(menu.aut_m == 0) {
             u8 aut_h0 = 0;
@@ -577,9 +690,7 @@ void MenuSetAutData(u8 num) {
                 aut_h3 = num;
                 menu.aut_m_num = 0;
                 menu.aut_m = 8;
-                MenuSaveData();//保存数据
-                menu.siuare_data[2] = (u16)(menu.siuare_data[1]* (best_sep_aaive/best_arrive));
-                ComSend(0xb0,(u8)(menu.siuare_data[0]/menu.siuare_data[1]),(u8)(menu.siuare_data[2]),(u8)(menu.siuare_data[2] >> 8));
+                
             }
             menu.siuare_data[menu.aut_group] = aut_h0*1000;
             menu.siuare_data[menu.aut_group] += aut_h1*100;
@@ -587,6 +698,25 @@ void MenuSetAutData(u8 num) {
             menu.siuare_data[menu.aut_group] += aut_h3;
             if(menu.siuare_data[1] > menu.siuare_data[0]) {
                 menu.siuare_data[1] = menu.siuare_data[0];
+            }
+            if(menu.siuare_data[2] > 100) {
+                menu.siuare_data[1] = 100;
+            }
+            if(menu.aut_m == 8) {
+                MenuSaveData();//保存数据
+                switch( menu.aut_group ) {
+                case 0:
+                    ComSend(COM_SIU_DATA,0x00,(u8)(menu.siuare_data[0]),(u8)(menu.siuare_data[0] >> 8));
+                    break;
+                case 1:
+                    ComSend(COM_SIU_DATA,0x01,(u8)(menu.siuare_data[1]),(u8)(menu.siuare_data[1] >> 8));
+                    break;
+                case 2:
+                    ComSend(COM_SIU_DATA,0x02,(u8)(menu.siuare_data[2]),0x00);
+                    break;
+                default:
+                    break;
+                }  
             }
         }
     } else if(menu.mode == 3) {//普通设置
@@ -637,39 +767,14 @@ void MenuModeSet(u8 cmd) {
             menu.aut_group = 0;
             menu.set_pag1 = 0;
             MenuShowMode(menu.mode);//显示当前模式
-            MenuShowData(menu.mode);//显示数据
-            menu.knife_rear_size_setp = (u16)(( (best_arrive-menu.knife_rear_size) * (best_sep_aaive/best_arrive)));
-            //menu.knife_rear_size_setp = best_sep_aaive - menu.knife_rear_size_setp;
-            if(menu.push_book == 0) {
-                ComSend(0x04,menu.mode,(u8)(menu.knife_rear_size_setp),(u8)(menu.knife_rear_size_setp >> 8));
-            } else {
-                ComSend(0x05,menu.mode,(u8)(menu.knife_rear_size_setp),(u8)(menu.knife_rear_size_setp >> 8));
-            }
-            DelayMs(30);
-            if(menu.mode == 2) {//等分模式
-                DelayMs(20);
-                menu.siuare_data[2] = (u16)(menu.siuare_data[1]* (best_sep_aaive/best_arrive));
-                ComSend(0xb0,(u8)(menu.siuare_data[0]/menu.siuare_data[1]),(u8)(menu.siuare_data[2]),(u8)(menu.siuare_data[2] >> 8));
-            }
-            MenuSaveData();
+            MenuShowData(menu.mode);//显示数据  COM_MODE
+            ComSend(COM_MODE,menu.mode,0x00,0x00);
         break;
         case 22://确认按键
             if(menu.mode == 0) {//自动模式
                 menu.knife_rear_size = menu.aut_e[menu.aut_group];
-                LCDPos(0,1);
-                LCDNum(menu.knife_rear_size/1000);
-                LCDNum(menu.knife_rear_size/100%10);
-                LCDNum(menu.knife_rear_size%100/10);
-                LcdFolt(14);
                 LCDNum(menu.knife_rear_size%10);  
-                
-                menu.knife_rear_size_setp = (u16)(( (best_arrive-menu.knife_rear_size) * (15.9)));
-                //menu.knife_rear_size_setp = best_sep_aaive - menu.knife_rear_size_setp;
-                if(menu.push_book == 0) {
-                    ComSend(0x04,menu.mode,(u8)(menu.knife_rear_size_setp),(u8)(menu.knife_rear_size_setp >> 8));
-                } else {
-                    ComSend(0x05,menu.mode,(u8)(menu.knife_rear_size_setp),(u8)(menu.knife_rear_size_setp >> 8));
-                }
+                ComSend(COM_SETP,(u8)(menu.knife_rear_size),(u8)(menu.knife_rear_size >> 8),0);//步进电机
                 MenuSaveData();
             } else if(menu.mode == 3) {//普通设置模式
                 switch(menu.set_pag1) {
@@ -697,7 +802,7 @@ void MenuModeSet(u8 cmd) {
                 switch(menu.set_pag1) {
                 case 3://电机力度
                     EepromWrite(39,menu.moto_vigor);
-                    ComSend(0x08,menu.moto_vigor,0x00,0x00);
+                    ComSend(COM_STRENGTH,menu.moto_vigor,0x00,0x00);
                     break;
                 case 4://刀位置
                      EepromWrite(40,menu.mtot_cut_place);
@@ -721,6 +826,24 @@ void MenuModeSet(u8 cmd) {
                     menu.set_pag1 += 3;
                 }
                 MenuShowData(menu.mode);//显示数据
+            } else if(menu.mode == 1) {//手动模式
+                menu.knife_rear_size = menu.manual_m;
+                ComSend(COM_SETP,(u8)(menu.knife_rear_size),(u8)(menu.knife_rear_size >> 8),0);//步进电机走
+                MenuSaveData();
+            } else if(menu.mode == 5) {//老化模式
+                switch( menu.set_pag1 ) {
+                    case 0://刀
+                        ComSend(COM_OLD,0x01,0x00,0);
+                        break;
+                    case 1://刀加丝杆
+                        ComSend(COM_OLD,0x01,0x01,0);
+                        break;
+                    case 2://丝杆
+                        ComSend(COM_OLD,0x01,0x02,0);
+                        break;
+                    default:
+                        break;
+                }
             }
         break;
         case 0://按键 下
@@ -757,7 +880,7 @@ void MenuModeSet(u8 cmd) {
                 if(menu.aut_group > 0) {
                     menu.aut_group--;
                 } else {
-                    menu.aut_group = 1;
+                    menu.aut_group = 2;
                 }
             } else if(menu.mode == 4) {//系统设置模式
                 switch(menu.set_pag1) {
@@ -765,7 +888,7 @@ void MenuModeSet(u8 cmd) {
                     if(menu.moto_vigor > 1) {
                         menu.moto_vigor--;
                     } else {
-                        menu.moto_vigor = 9;
+                        menu.moto_vigor = 4;
                     }
                     break;
                 case 4://刀位置设置
@@ -789,6 +912,12 @@ void MenuModeSet(u8 cmd) {
                         menu.set_pag1 = 2;
                     }
                     break;
+                }
+            } else if(menu.mode == 5) {//老化模式
+                if(menu.set_pag1 > 0) {
+                    menu.set_pag1--;
+                } else {
+                    menu.set_pag1 = 2;
                 }
             }
             MenuShowData(menu.mode);//显示数据
@@ -825,7 +954,7 @@ void MenuModeSet(u8 cmd) {
                     }
                 }
             } else if(menu.mode == 2) {//等分模式
-                if(menu.aut_group < 1) {
+                if(menu.aut_group < 2) {
                     menu.aut_group++;
                 } else {
                     menu.aut_group = 0;
@@ -833,7 +962,7 @@ void MenuModeSet(u8 cmd) {
             } else if(menu.mode == 4) {//系统设置模式
                 switch(menu.set_pag1) {
                 case 3://点击力度
-                    if(menu.moto_vigor < 9) {
+                    if(menu.moto_vigor < 4) {
                         menu.moto_vigor++;
                     } else {
                         menu.moto_vigor = 1;
@@ -861,6 +990,12 @@ void MenuModeSet(u8 cmd) {
                     }
                     break;
                 }  
+            } else if(menu.mode == 5) {//老化模式
+                if(menu.set_pag1 < 2) {
+                    menu.set_pag1++;
+                } else {
+                    menu.set_pag1 = 0;
+                }
             }
             MenuShowData(menu.mode);//显示数据
         break;
@@ -879,25 +1014,26 @@ void MenuModeSet(u8 cmd) {
                     menu.aut_m = 0;
                 }
                 MenuShowData(menu.mode);//显示数据
+            } else if(menu.mode == 1) {//手动模式
+                 if(menu.aut_m == 0) {
+                    menu.aut_m = 8;
+                } else {
+                    menu.aut_m = 0;
+                }
+                MenuShowData(menu.mode);//显示数据
             }
         break;
         case 21://推书键短按
             if(menu.push_book == 0) {
                 menu.push_book = 1;
-                //ComSend(0x05,menu.mode,0x00,0x00);//复位
             } else {
                 menu.push_book = 0;
-                //ComSend(0x04,menu.mode,0x00,0x00);//复位
             }
-            if(menu.push_book == 0) {
-                ComSend(0x04,menu.mode,(u8)(menu.knife_rear_size_setp),(u8)(menu.knife_rear_size_setp >> 8));
-            } else {
-                ComSend(0x05,menu.mode,(u8)(menu.knife_rear_size_setp),(u8)(menu.knife_rear_size_setp >> 8));
-            }
+            ComSend(COM_PUSH_BOOK,menu.push_book,0x00,0x00);
             MenuShowPushFlag(menu.push_book);
         break;
         case 50://推书按键长按
-            ComSend(0x06,0x00,0x00,0x00);//复位
+            ComSend(COM_STP_RST,0x00,0x00,0x00);//复位
         break;
         case 60://功能键按下
             menu.program = 1;//进入编程模式
@@ -905,12 +1041,12 @@ void MenuModeSet(u8 cmd) {
         case 16://功能键放开
             if(menu.program == 4) {
                 menu.program = 0;
-                menu.mode = 3;
+                menu.mode = 3;//普通设置
                 MenuShowMode(menu.mode);//显示当前模式
                 MenuShowData(menu.mode);//显示数据
             } else if(menu.program == 5){
                 menu.program = 0;
-                menu.mode = 4;
+                menu.mode = 4;//系统设置
                 MenuShowMode(menu.mode);//显示当前模式
                 MenuShowData(menu.mode);//显示数据
             } else if(menu.program == 22) {//老化模式
@@ -918,9 +1054,16 @@ void MenuModeSet(u8 cmd) {
                 menu.mode = 5;//老化模式
                 MenuShowMode(menu.mode);//显示当前模式
                 MenuShowData(menu.mode);//显示数据
-                ComSend(0xa1,0x01,0x00,0x00);//老化
+                //ComSend(0xa1,0x01,0x00,0x00);//老化
             } else {
-                menu.program = 0;
+                if(menu.mode != 3) {
+                    menu.program = 0;
+                    menu.mode = 3;//普通设置
+                    MenuShowMode(menu.mode);//显示当前模式
+                    MenuShowData(menu.mode);//显示数据
+                } else {
+                    menu.program = 0;
+                }
             }
             break;
         case 23://数字键0
@@ -1094,22 +1237,17 @@ void MenuAsk(void) {
     if(ComGetFlag() == 0x01) {
         ComSetFlag(0x00);
         switch( ComGetDate(1) ) {
-        case 0x07://退纸电机位置
-            if(menu.mode == 1) {
-                u16 m_dat = 0;
-                m_dat = ComGetDate(2);
-                m_dat |= (u16)(ComGetDate(3) << 8);
-                m_dat = best_sep_aaive - m_dat;
-                menu.knife_rear_size = (u16)(m_dat/15.9);
+        case 0x01://退纸电机位置
+                menu.knife_rear_size = ComGetDate(2);
+                menu.knife_rear_size |= (u16)(ComGetDate(3) << 8);
                 LCDPos(0,1);
                 LCDNum(menu.knife_rear_size/1000);
                 LCDNum(menu.knife_rear_size/100%10);
                 LCDNum(menu.knife_rear_size%100/10);
                 LcdFolt(14);
                 LCDNum(menu.knife_rear_size%10);  
-            }
             break;
-        case 0x03://切纸
+        case 0x06://切纸
             menu.cnt++;
             menu.ttl++;
             EepromWrite(8,(u8)menu.ttl);
@@ -1117,25 +1255,7 @@ void MenuAsk(void) {
             MenuShowData(menu.mode);//显示数据
             break;
         case 0x44://有错误
-            switch( ComGetDate(2) ) {
-            case 0x01://压纸电机错误
-                if(ComGetDate(3) == 0) {
-                    ComGetDate(0);
-                } else {
-                    ComGetDate(1);
-                }
-                break;
-            case 0x02://切纸电机错误
-                if(ComGetDate(3) == 0) {
-                    ComGetDate(2);
-                } else {
-                    ComGetDate(3);
-                }
-                break;
-            case 0x03://步进电机错误
-                ComGetDate(4);
-                break;
-            }
+            MenuShowError(ComGetDate(2));
             break;
         default:
             break;
